@@ -1,10 +1,20 @@
 #[cfg(feature = "buddy-alloc")]
 mod alloc;
 mod wasm4;
+
+mod board;
 mod display;
+mod game;
 mod grid;
+mod ship;
+mod rand;
+
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 
 use wasm4::*;
+use board::*;
+use game::*;
 use display::*;
 use grid::*;
 
@@ -20,10 +30,13 @@ const SMILEY: [u8; 8] = [
     0b11000011,
 ];
 
+lazy_static! {
+    static ref GAME: Mutex<Game> = Mutex::new(Game::new());
+}
+
 #[no_mangle]
 fn start() {
-    let palette: Palette = Palette::new(PALETTE_DEMICHROME);
-    palette.set_colors();
+    Palette::set(PALETTE_DEMICHROME);
 }
 
 #[no_mangle]
@@ -34,9 +47,14 @@ fn update() {
     let gamepad = unsafe { *GAMEPAD1 };
     if gamepad & BUTTON_1 != 0 {
         Palette::use_colors(Color::Four, None);
+        GAME.lock().unwrap().advance();
     }
 
-    let grid: Grid = Grid::new(10, 10);
+    let mut grid: Grid = Grid::new();
+    let mouse_x = unsafe { *MOUSE_X };
+    let mouse_y = unsafe { *MOUSE_Y };
+    grid.hover(i32::from(mouse_x), i32::from(mouse_y));
+
     grid.render();
 
     //blit(&SMILEY, 76, 76, 8, 8, BLIT_1BPP);
